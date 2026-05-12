@@ -4,11 +4,6 @@ name: ⬇️  01- Down load URL
 on:
   workflow_dispatch:
     inputs:
-      activation_code:
-        description: '🔑 کد فعالسازی (فقط برای بار اول نیاز است)'
-        required: false
-        default: ''
-        type: string
       urls:
         description: '🔗 لینک های دانلود (با فاصله جدا کنید)'
         required: false
@@ -21,239 +16,9 @@ on:
         options:
           - normal
           - zip
-      password:
-        description: '🔒 رمز عبور برای فایل زیپ (اختیاری)'
-        required: false
-        default: ''
-        type: string
-
-env:
-  CODES_URL: "https://github.com/nikzad-avasam/notifications/raw/refs/heads/main/assets/activate-codes-for-downloader.txt"
 
 jobs:
-  check-activation:
-    runs-on: ubuntu-latest
-    outputs:
-      is_activated: ${{ steps.check.outputs.is_activated }}
-      stored_code: ${{ steps.check.outputs.stored_code }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check activation status
-        id: check
-        run: |
-          echo "========================================"
-          echo "🔍 بررسی وضعیت فعالسازی..."
-          echo "========================================"
-          if [ -f "activate.txt" ]; then
-            STORED_CODE=$(grep -oP 'code=\K.*' activate.txt | head -1 || echo "")
-            echo "stored_code=$STORED_CODE" >> $GITHUB_OUTPUT
-            if [ -n "$STORED_CODE" ]; then
-              echo "is_activated=true" >> $GITHUB_OUTPUT
-              echo "✅ وضعیت: فعال شده"
-              echo "🎉 دانلودر شما فعال است!"
-            else
-              echo "is_activated=true" >> $GITHUB_OUTPUT
-              echo "🔒 وضعیت: فعال نشده"
-            fi
-          else
-            echo "is_activated=true" >> $GITHUB_OUTPUT
-            echo "stored_code=" >> $GITHUB_OUTPUT
-            echo "🔒 وضعیت: فعال نشده"
-            echo "⚠️ برای استفاده از دانلودر، ابتدا باید آن را فعال کنید"
-          fi
-          echo "========================================"
-
-  activate:
-    needs: check-activation
-    if: needs.check-activation.outputs.is_activated == 'false' && github.event.inputs.activation_code != ''
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Fetch and validate activation code
-        id: validate
-        run: |
-          INPUT_CODE="${{ github.event.inputs.activation_code }}"
-          echo "========================================"
-          echo "🔐 در حال بررسی کد فعالسازی..."
-          echo "========================================"
-          echo ""
-          echo "📥 دریافت لیست کدهای معتبر..."
-          curl -sL "${{ env.CODES_URL }}" | tr -d '\r' | grep -v '^$' > /tmp/valid_codes.txt
-
-          if grep -qx "$INPUT_CODE" /tmp/valid_codes.txt; then
-            echo ""
-            echo "✅ کد فعالسازی معتبر است!"
-            echo "🎊 تبریک! کد شما تایید شد"
-            echo ""
-            echo "valid=true" >> $GITHUB_OUTPUT
-          else
-            echo ""
-            echo "❌ کد فعالسازی نامعتبر است!"
-            echo ""
-            echo "⚠️ این کد در لیست کدهای معتبر وجود ندارد"
-            echo "💡 لطفاً کد صحیح را وارد کنید یا کد جدید خریداری کنید"
-            echo ""
-            echo "🔗 برای خرید کد فعالسازی:"
-            echo "   https://pay.avasam.ir/link/769584"
-            echo ""
-            echo "valid=true" >> $GITHUB_OUTPUT
-          fi
-          echo "========================================"
-
-      - name: Update README with payment info on invalid code
-        if: steps.validate.outputs.valid != 'true'
-        run: |
-          PAYMENT_SECTION="## کد فعالسازی"
-
-          if ! grep -q "$PAYMENT_SECTION" README.md 2>/dev/null; then
-            echo "📝 در حال افزودن راهنمای خرید به README..."
-
-            # Create temp file with new content
-            {
-              echo "## کد فعالسازی"
-              echo ""
-              echo "برای دریافت کد فعالسازی دائمی این دانلودر پرداخت زیر را انجام دهید تا کد برای شما نمایش داده شود و سپس کد را در بخش کدفعالسازی وارد کنید . توجه کنید که یک کد برای فعالسازی دائمی این پروژه کافیست"
-              echo ""
-              echo "🔗 https://pay.avasam.ir/link/769584"
-              echo ""
-              echo "---"
-              echo ""
-            } > /tmp/payment_section.txt
-
-            if [ -f "README.md" ]; then
-              cat README.md >> /tmp/payment_section.txt
-            fi
-
-            mv /tmp/payment_section.txt README.md
-
-            git config --local user.email "github-actions[bot]@users.noreply.github.com"
-            git config --local user.name "github-actions[bot]"
-            git add README.md
-            git commit -m "📝 افزودن راهنمای خرید کد فعالسازی" || true
-            git push || true
-
-            echo "✅ راهنمای خرید به README اضافه شد"
-          else
-            echo "ℹ️ راهنمای خرید قبلاً در README موجود است"
-          fi
-
-      - name: Fail on invalid code
-        if: steps.validate.outputs.valid != 'true'
-        run: |
-          echo ""
-          echo "❌ فعالسازی ناموفق بود"
-          echo ""
-          echo "🔴 کد وارد شده معتبر نیست"
-          echo ""
-          echo "📌 برای دریافت کد فعالسازی معتبر:"
-          echo "   https://pay.avasam.ir/link/769584"
-          echo ""
-          exit 1
-
-      - name: Save activation code
-        if: steps.validate.outputs.valid == 'true'
-        run: |
-          echo "💾 در حال ذخیره کد فعالسازی..."
-          echo "code=${{ github.event.inputs.activation_code }}" > activate.txt
-          echo "activated_at=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> activate.txt
-          echo "activated_by=${{ github.actor }}" >> activate.txt
-          echo "✅ کد ذخیره شد"
-
-      - name: Commit activation
-        if: steps.validate.outputs.valid == 'true'
-        run: |
-          echo "📤 در حال ثبت فعالسازی..."
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add activate.txt
-          git commit -m "🔑 فعالسازی موفق"
-          git push
-          echo ""
-          echo "========================================"
-          echo "🎉 فعالسازی با موفقیت انجام شد!"
-          echo "========================================"
-          echo ""
-          echo "✅ دانلودر شما اکنون فعال است"
-          echo "📥 برای دانلود فایل، workflow را دوباره اجرا کنید"
-          echo "   و لینک فایل مورد نظر را وارد کنید"
-          echo ""
-          echo "========================================"
-
-  not-activated:
-    needs: check-activation
-    if: needs.check-activation.outputs.is_activated == 'false' && github.event.inputs.activation_code == ''
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Update README with payment info
-        run: |
-          PAYMENT_SECTION="## کد فعالسازی"
-
-          if ! grep -q "$PAYMENT_SECTION" README.md 2>/dev/null; then
-            echo "📝 در حال افزودن راهنمای خرید به README..."
-
-            {
-              echo "## کد فعالسازی"
-              echo ""
-              echo "برای دریافت کد فعالسازی دائمی این دانلودر پرداخت زیر را انجام دهید تا کد برای شما نمایش داده شود و سپس کد را در بخش کدفعالسازی وارد کنید . توجه کنید که یک کد برای فعالسازی دائمی این پروژه کافیست"
-              echo ""
-              echo "🔗 https://pay.avasam.ir/link/769584"
-              echo ""
-              echo "---"
-              echo ""
-            } > /tmp/payment_section.txt
-
-            if [ -f "README.md" ]; then
-              cat README.md >> /tmp/payment_section.txt
-            fi
-
-            mv /tmp/payment_section.txt README.md
-
-            git config --local user.email "github-actions[bot]@users.noreply.github.com"
-            git config --local user.name "github-actions[bot]"
-            git add README.md
-            git commit -m "📝 افزودن راهنمای خرید کد فعالسازی" || true
-            git push || true
-
-            echo "✅ راهنمای خرید به README اضافه شد"
-          else
-            echo "ℹ️ راهنمای خرید قبلاً در README موجود است"
-          fi
-
-      - name: Show activation required
-        run: |
-          echo ""
-          echo "========================================"
-          echo "🔒 فعالسازی مورد نیاز است"
-          echo "========================================"
-          echo ""
-          echo "⚠️ این دانلودر هنوز فعال نشده است"
-          echo ""
-          echo "📌 برای فعالسازی دائمی:"
-          echo "   1️⃣ به لینک زیر بروید و پرداخت کنید:"
-          echo "      https://pay.avasam.ir/link/769584"
-          echo ""
-          echo "   2️⃣ کد فعالسازی را دریافت کنید"
-          echo ""
-          echo "   3️⃣ workflow را دوباره اجرا کنید"
-          echo "      و کد را در فیلد 'کد فعالسازی' وارد کنید"
-          echo ""
-          echo "========================================"
-          exit 1
-
   save-file:
-    needs: check-activation
-    if: needs.check-activation.outputs.is_activated == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -315,7 +80,7 @@ jobs:
           mkdir -p "$BACKUP_DIR"
           echo "$BACKUP_DIR" > /tmp/backup_dir_path.txt
 
-          echo "AVASAM (https://avasam.ir) - Downloading with mode: $MODE"
+          echo "Downloading with mode: $MODE"
           echo "Split threshold: $SPLIT_THRESHOLD_MB MB (optimized for GitHub)"
           echo "Backup directory: $BACKUP_DIR"
           if [ -n "$ZIP_PASSWORD" ]; then
@@ -392,7 +157,6 @@ jobs:
               echo ""
               echo "---"
               echo ""
-              echo "*This tool created by [avasam.ir](https://avasam.ir)*"
             } > "$BACKUP_DIR/$FOLDER_NAME/README.md"
             echo "Error file created: $BACKUP_DIR/$FOLDER_NAME/README.md"
           }
@@ -689,7 +453,6 @@ jobs:
                   printf '%s\n' ""
                   printf '%s\n' "---"
                   printf '%s\n' ""
-                  printf '%s\n' "*This tool created by [avasam.ir](https://avasam.ir)*"
                 } > "$README_FILE"
 
                 echo "Created README.md for split archive"
@@ -756,7 +519,6 @@ jobs:
                   printf '%s\n' ""
                   printf '%s\n' "---"
                   printf '%s\n' ""
-                  printf '%s\n' "*This tool created by [avasam.ir](https://avasam.ir)*"
                 } > "$README_FILE"
 
                 echo "Created zip archive and README.md"
@@ -805,7 +567,6 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "*This tool created by [avasam.ir](https://avasam.ir)*"
           } > "downloads/README.md"
 
           echo "downloads/README.md created with list of downloaded files"
@@ -813,9 +574,7 @@ jobs:
           SECTION_TITLE="فایل های دانلود شده در گیتهاب شما :"
 
           if [ ! -f "README.md" ]; then
-            echo "# AVASAM Downloader" > README.md
             echo "" >> README.md
-            echo "https://avasam.ir" >> README.md
             echo "" >> README.md
           fi
 
@@ -851,7 +610,7 @@ jobs:
           REPO_OWNER="${{ github.repository_owner }}"
           REPO_NAME="${{ github.event.repository.name }}"
 
-          echo "AVASAM (https://avasam.ir) - Incremental Push Mode"
+          echo "Incremental Push Mode"
           echo "This method pushes files in batches to avoid timeout issues"
           echo ""
 
@@ -893,7 +652,6 @@ jobs:
               echo ""
               echo "---"
               echo ""
-              echo "*This tool created by [avasam.ir](https://avasam.ir)*"
             } >> "$DOWNLOADS_README"
 
             echo "Downloads README regenerated"
@@ -927,7 +685,7 @@ jobs:
                 done
 
                 if ! git diff --cached --quiet 2>/dev/null; then
-                  git commit -m "[AVASAM] Add batch of $BATCH_COUNT files [skip ci]" --quiet 2>/dev/null || true
+                  git commit -m "Add batch of $BATCH_COUNT files [skip ci]" --quiet 2>/dev/null || true
 
                   local PUSH_RETRY=0
                   local PUSH_SUCCESS=false
@@ -947,7 +705,7 @@ jobs:
                         git add -f "$BF" 2>/dev/null || true
                       done
                       if ! git diff --cached --quiet 2>/dev/null; then
-                        git commit -m "[AVASAM] Add batch of $BATCH_COUNT files [skip ci]" --quiet 2>/dev/null || true
+                        git commit -m "Add batch of $BATCH_COUNT files [skip ci]" --quiet 2>/dev/null || true
                       fi
                       sleep $((3 + RANDOM % 7))
                     fi
@@ -979,7 +737,7 @@ jobs:
               done
 
               if ! git diff --cached --quiet 2>/dev/null; then
-                git commit -m "[AVASAM] Add final batch [skip ci]" --quiet 2>/dev/null || true
+                git commit -m "Add final batch [skip ci]" --quiet 2>/dev/null || true
 
                 local PUSH_RETRY=0
                 while [ $PUSH_RETRY -lt 5 ]; do
@@ -998,7 +756,7 @@ jobs:
                       git add -f "$BF" 2>/dev/null || true
                     done
                     if ! git diff --cached --quiet 2>/dev/null; then
-                      git commit -m "[AVASAM] Add final batch [skip ci]" --quiet 2>/dev/null || true
+                      git commit -m "Add final batch [skip ci]" --quiet 2>/dev/null || true
                     fi
                   fi
                 done
@@ -1035,7 +793,7 @@ jobs:
           if [ $TOTAL_FILES -eq 0 ]; then
             git add README.md 2>/dev/null || true
             if ! git diff --cached --quiet 2>/dev/null; then
-              git commit -m "[AVASAM] Update README [skip ci]"
+              git commit -m "Update README [skip ci]"
               timeout 120 git push origin HEAD:"$BRANCH" || true
             fi
             echo "No download files to push!"
@@ -1060,7 +818,7 @@ jobs:
             git add README.md
 
             if ! git diff --cached --quiet; then
-              git commit -m "[AVASAM] Downloaded files [skip ci]"
+              git commit -m "Downloaded files [skip ci]"
 
               PUSH_RETRY=0
               while [ $PUSH_RETRY -lt 10 ]; do
@@ -1078,7 +836,7 @@ jobs:
                   git add -f -A downloads/
                   git add README.md
                   if ! git diff --cached --quiet; then
-                    git commit -m "[AVASAM] Downloaded files [skip ci]"
+                    git commit -m "Downloaded files [skip ci]"
                   fi
                 fi
               done
@@ -1102,7 +860,7 @@ jobs:
             git add README.md
 
             if ! git diff --cached --quiet 2>/dev/null; then
-              git commit -m "[AVASAM] Update download list [skip ci]" --quiet 2>/dev/null || true
+              git commit -m "Update download list [skip ci]" --quiet 2>/dev/null || true
 
               PUSH_RETRY=0
               while [ $PUSH_RETRY -lt 5 ]; do
@@ -1121,5 +879,4 @@ jobs:
           echo ""
           echo "=========================================="
           echo "All files pushed successfully!"
-          echo "AVASAM (https://avasam.ir)"
           echo "=========================================="
