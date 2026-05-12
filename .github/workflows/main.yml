@@ -577,7 +577,6 @@ jobs:
                     echo ""
                     echo "---"
                     echo ""
-                    echo "*This tool created by [avasam.ir](https://avasam.ir)*"
                   } > "$BACKUP_DIR/$FOLDER_NAME/README.md"
                 fi
               else
