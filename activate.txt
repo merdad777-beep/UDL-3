@@ -1,3 +1,0 @@
-code=9923
-activated_at=2026-05-11 18:05:26 UTC
-activated_by=merdad777-beep
