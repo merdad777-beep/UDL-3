@@ -1,6 +1,0 @@
-# Downloaded list :
-
-- [apk](./apk)
-
----
-
